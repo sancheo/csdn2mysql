@@ -1,4 +1,7 @@
+# 要爬取的csdn博客用户名
 csdnUserName: "geekqian"
+# 爬取的文章类型 1 原创 2 转载 4 翻译
+articleTypes: "1|2|4"
 mysql:
   host: 127.0.0.1
   port: 3306

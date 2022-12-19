@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,7 +21,6 @@ import (
 )
 
 func init() {
-
 	viper.SetConfigName("base")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath("conf")
@@ -46,9 +46,7 @@ func initMySQL() {
 	dbname := mysqlConf["dbname"]
 	username := mysqlConf["username"]
 	pwd := mysqlConf["pwd"]
-	// "root:12345678@tcp(127.0.0.1:3306)/test"
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", username, pwd, host, port, dbname)
-	// fmt.Println(dsn)
 	conn, err := sql.Open("mysql", dsn)
 	if err != nil {
 		err := errors.Wrap(err, "sql open")
@@ -89,6 +87,7 @@ type CSDNArticle struct {
 // CrawlingCSDN 爬取指定的CSDN博客
 func crawlingCSDN() {
 	userName := viper.GetString("csdnUserName")
+	articleTypes := viper.GetString("articleTypes")
 	Logger.Info().Msg(fmt.Sprintf("开始爬取指定博客:%s...", userName))
 	url := "https://blog.csdn.net/community/home-api/v1/get-business-list?"
 	hasMore := true
@@ -117,11 +116,12 @@ func crawlingCSDN() {
 		}
 		for i := 0; i < len(art.Data.List); i++ {
 			item := art.Data.List[i]
-			if item.ArticleType == 1 { // 1 原创 2 转载
+			if strings.Contains(articleTypes, strconv.Itoa(item.ArticleType)) { // 1 原创 2 转载 4 翻译
 				articleId := ids.GenerateID()
 				articleLink := item.URL
 				updateTime := time.Unix(item.PostTime/1000, 0).String()[0:19]
 				publishTime := time.Unix(item.CreateTime/1000, 0).String()[0:19]
+				articleType := item.ArticleType
 				createTime := publishTime
 				articleName := item.Title
 				articleDesc := item.Description
@@ -198,9 +198,9 @@ func crawlingCSDN() {
 					}
 				}
 				sqlStr := "INSERT INTO csdn_article" +
-					"(article_id, author, article_desc, article_link, article_name, classification, article_tags, article_content, publish_time, create_time, update_time) " +
-					"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"
-				_, err = CsdnDB.Exec(sqlStr, articleId, userName, articleDesc, articleLink, articleName, categorys,
+					"(article_id, author, article_desc, article_link, article_name, article_type, classification, article_tags, article_content, publish_time, create_time, update_time) " +
+					"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"
+				_, err = CsdnDB.Exec(sqlStr, articleId, userName, articleDesc, articleLink, articleName, articleType, categorys,
 					tags, content, publishTime, createTime, updateTime)
 				if err != nil {
 					err := errors.Wrap(err, "insert article sql")
